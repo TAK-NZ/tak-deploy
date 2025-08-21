@@ -18,6 +18,7 @@ BASE_INFRA_REPO="https://github.com/TAK-NZ/base-infra"
 AUTH_INFRA_REPO="https://github.com/TAK-NZ/auth-infra"
 TAK_INFRA_REPO="https://github.com/TAK-NZ/tak-infra"
 CLOUDTAK_REPO="https://github.com/TAK-NZ/CloudTAK"
+MEDIA_INFRA_REPO="https://github.com/TAK-NZ/media-infra"
 
 # Store initial directory
 INITIAL_DIR=$(pwd)
@@ -149,9 +150,10 @@ update_repo "$BASE_INFRA_REPO"
 update_repo "$AUTH_INFRA_REPO"
 update_repo "$TAK_INFRA_REPO"
 
-# Update CloudTAK repository if needed
+# Update CloudTAK and MediaInfra repositories if needed
 if [ "$DEPLOY_CLOUDTAK" = true ]; then
     update_repo "$CLOUDTAK_REPO"
+    update_repo "$MEDIA_INFRA_REPO"
 fi
 
 # Validate TAK server version (skip for destroy mode)
@@ -174,6 +176,16 @@ fi
 if [ "$DESTROY_MODE" = true ]; then
     # Destroy stacks in reverse order
     echo "Destroying TAK infrastructure in reverse order..."
+    
+    # Destroy media-infra if enabled
+    if [ "$DEPLOY_CLOUDTAK" = true ] && [ -d "media-infra" ]; then
+        echo "Destroying MediaInfra..."
+        cd media-infra
+        npm install
+        export CDK_DEFAULT_REGION="$REGION"
+        npm run cdk destroy -- --context envType="$ENV_TYPE" --context stackName="$STACK_NAME" --force
+        cd ..
+    fi
     
     # Destroy CloudTAK if enabled
     if [ "$DEPLOY_CLOUDTAK" = true ] && [ -d "CloudTAK" ]; then
@@ -318,6 +330,20 @@ else
             --context useS3CloudTAKConfigFile=true \
             --require-approval never $NO_ROLLBACK
         cd ../..
+        
+        # Deploy MediaInfra
+        echo "Deploying MediaInfra..."
+        cd media-infra
+        npm install
+        export CDK_DEFAULT_REGION="$REGION"
+        npm run cdk deploy -- \
+            --context envType="$ENV_TYPE" \
+            --context stackName="$STACK_NAME" \
+            --context tak-project="$PROJECT" \
+            --context tak-component="MediaInfra" \
+            --context tak-region="$REGION" \
+            --require-approval never $NO_ROLLBACK
+        cd ..
     fi
     
     # Calculate and display deployment duration
