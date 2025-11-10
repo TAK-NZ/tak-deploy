@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: tak-postgres
+    environment:
+      POSTGRES_DB: cot
+      POSTGRES_USER: ${POSTGRES_USER:-takserver}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tak-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U takserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # TAK Server
+  tak-server:
+    build:
+      context: ./docker/tak-server
+      args:
+        TAK_VERSION: ${TAK_VERSION:-5.5-RELEASE58}
+    container_name: tak-server
+    hostname: ${TAK_HOSTNAME:-tak-server}
+    environment:
+      # Database connection
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cot
+      DB_USER: ${POSTGRES_USER:-takserver}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+
+      # TAK Server config
+      TAK_CERT_ORG: ${TAK_CERT_ORG:-NERV Systems}
+      TAK_CERT_OU: ${TAK_CERT_OU:-TAK}
+      TAK_CERT_CITY: ${TAK_CERT_CITY:-Singapore}
+      TAK_CERT_STATE: ${TAK_CERT_STATE:-Singapore}
+      TAK_CERT_COUNTRY: ${TAK_CERT_COUNTRY:-SG}
+
+    ports:
+      - "8089:8089"   # TAK Server API
+      - "8443:8443"   # Web UI
+      - "8444:8444"   # Certificate enrollment
+      - "8446:8446"   # Federation
+      - "9000:9000"   # Streaming
+      - "9001:9001"   # Streaming TLS
+    volumes:
+      - tak-certs:/opt/tak/certs
+      - tak-logs:/opt/tak/logs
+      - tak-data:/opt/tak/db-utils
+    networks:
+      - tak-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/Marti/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # NERVA AI Sidecar (placeholder - your team will provide image)
+  nerva:
+    image: ${NERVA_IMAGE:-alpine:latest}  # Replace with your NERVA image
+    container_name: nerva
+    environment:
+      # TAK connection
+      TAK_HOST: tak-server
+      TAK_PORT: 8089
+      TAK_API_URL: https://tak-server:8443
+
+      # Database connection
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cot
+      DB_USER: ${POSTGRES_USER:-takserver}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+
+      # NERVA config
+      NERVA_MODE: ${NERVA_MODE:-full}  # lite, full, custom
+
+    volumes:
+      - tak-certs:/certs:ro  # Read-only access to TAK certificates
+    networks:
+      - tak-network
+    depends_on:
+      tak-server:
+        condition: service_healthy
+    # Remove this if using actual NERVA image
+    command: ["sh", "-c", "echo 'NERVA placeholder - replace with actual NERVA container' && tail -f /dev/null"]
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    driver: local
+  tak-certs:
+    driver: local
+  tak-logs:
+    driver: local
+  tak-data:
+    driver: local
+
+networks:
+  tak-network:
+    driver: bridge

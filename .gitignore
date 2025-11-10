@@ -1,0 +1,46 @@
+# TAK Server files
+takserver-docker-*.zip
+*.p12
+*.jks
+*.pem
+*.key
+*.crt
+
+# Certificates
+certs/
+certificates/
+
+# Data directories
+data/
+postgres-data/
+tak-data/
+
+# Terraform
+aws/terraform/.terraform/
+aws/terraform/*.tfstate
+aws/terraform/*.tfstate.*
+aws/terraform/.terraform.lock.hcl
+aws/terraform/terraform.tfvars
+
+# Docker
+.env
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/

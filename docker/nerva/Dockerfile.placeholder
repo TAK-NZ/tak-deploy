@@ -1,0 +1,39 @@
+# NERVA AI Sidecar - Placeholder
+# Replace this with your actual NERVA container build
+
+FROM golang:1.21-alpine AS builder
+
+# This is a placeholder - your team will provide the actual NERVA build
+RUN echo "NERVA placeholder - replace with actual build steps"
+
+# Example structure for reference:
+# WORKDIR /app
+# COPY go.mod go.sum ./
+# RUN go mod download
+# COPY . .
+# RUN go build -o nerva ./cmd/nerva
+
+FROM alpine:latest
+
+# Install required tools for TAK connectivity
+RUN apk add --no-cache \
+    ca-certificates \
+    postgresql-client \
+    curl \
+    openssl
+
+# This is a placeholder
+# Replace with: COPY --from=builder /app/nerva /usr/local/bin/nerva
+
+# Environment variables that NERVA will need
+ENV TAK_HOST=tak-server \
+    TAK_PORT=8089 \
+    TAK_API_URL=https://tak-server:8443 \
+    DB_HOST=postgres \
+    DB_PORT=5432 \
+    DB_NAME=cot
+
+WORKDIR /app
+
+# Placeholder entrypoint
+CMD ["sh", "-c", "echo 'NERVA placeholder - waiting for actual implementation' && tail -f /dev/null"]

@@ -1,0 +1,15 @@
+# AWS Configuration
+environment      = "prod"
+aws_region       = "us-east-1"
+
+# Domain Configuration
+domain_name      = "tak.nervsystems.com"
+route53_zone_id  = "Z1234567890ABC"  # Replace with your Route53 zone ID
+
+# Network Configuration
+vpc_cidr            = "10.0.0.0/16"
+availability_zones  = ["us-east-1a", "us-east-1b"]
+
+# Customer Deployments
+# Managed via deploy-customer.sh script, not here
+customers = {}
