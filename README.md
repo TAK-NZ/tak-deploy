@@ -22,13 +22,17 @@ Downloads and runs the TAK infrastructure deployment script that:
 - Deploys BaseInfra (VPC, ECS, S3, certificates)
 - Deploys AuthInfra (Authentik SSO, LDAP)
 - Deploys TakInfra (TAK Server)
-- Optionally deploys CloudTAK (when DEPLOY_CLOUDTAK=true)
+- Deploys TAK Team Manager (manage orgs, teams, users, devices and channels)
+- Optionally deploys CloudTAK and MediaInfra (when DEPLOY_CLOUDTAK=true)
+
+Layers are deployed in this order, and destroyed in reverse: BaseInfra, AuthInfra, TakInfra, Team Manager, CloudTAK, MediaInfra.
 
 ## Prerequisites
 
 - AWS CLI configured
 - Docker installed and running
 - Node.js and npm
+- An AWS account with the Asia Pacific (New Zealand) `ap-southeast-6` region enabled (it is an opt-in region) and CDK bootstrapped there
 - [Route53 hosted zone](https://github.com/TAK-NZ/base-infra/blob/main/docs/AWS_GITHUB_SETUP.md#1-route-53-dns-setup)
 - TAK server zip file (takserver-docker-\<version\>.zip) from [tak.gov](https://tak.gov/products/tak-server) in current directory
 
@@ -40,6 +44,10 @@ Downloads and runs the TAK infrastructure deployment script that:
 ```
 
 To enable CloudTAK deployment, edit the script and set `DEPLOY_CLOUDTAK=true` at the top of the file.
+
+The default region is `ap-southeast-6` (Auckland). Change `REGION` at the top of the script to deploy elsewhere.
+
+Optional `authentik-config.env`, `takserver-config.env`, `tak-team-manager-config.env` and `cloudtak-config.env` files in the current directory are uploaded to the BaseInfra config bucket. An empty file is created for any that are missing.
 
 See `./deployAllLayers --help` for full options.
 
