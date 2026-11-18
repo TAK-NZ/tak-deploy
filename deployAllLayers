@@ -99,6 +99,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Make the AWS CLI and the CDK CLI use REGION. The CDK CLI resolves the target region from
+# AWS_REGION / AWS_DEFAULT_REGION or the AWS profile and overwrites CDK_DEFAULT_REGION with it,
+# so setting only CDK_DEFAULT_REGION would deploy to the profile's region instead.
+export AWS_REGION="$REGION"
+export AWS_DEFAULT_REGION="$REGION"
 # Check prerequisites and mandatory parameters (skip for destroy mode)
 if [ "$DESTROY_MODE" = false ]; then
     # Check Docker installation and status
