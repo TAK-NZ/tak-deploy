@@ -11,6 +11,7 @@ REGION="ap-southeast-6"
 BRANDING="generic"
 LDAP_BASE_DN="dc=ldap,dc=tak"
 LETS_ENCRYPT_MODE="production"
+DEPLOY_TAKTEAMMANAGER=true
 DEPLOY_CLOUDTAK=true
 
 # Repository URLs
@@ -50,6 +51,7 @@ show_help() {
     echo "  BRANDING            Branding type: \"generic\" or \"tak-nz\" (default: \"generic\")"
     echo "  LDAP_BASE_DN        LDAP base DN (default: \"dc=ldap,dc=tak\")"
     echo "  LETS_ENCRYPT_MODE   Let's Encrypt mode: \"staging\" or \"production\" (default: \"production\")"
+    echo "  DEPLOY_TAKTEAMMANAGER Deploy TAK Team Manager after TAK Server: true or false (default: true)"
     echo "  DEPLOY_CLOUDTAK     Deploy CloudTAK after TAK Server: true or false (default: false)"
     echo ""
     echo "PREREQUISITES:"
@@ -152,7 +154,10 @@ update_repo() {
 update_repo "$BASE_INFRA_REPO"
 update_repo "$AUTH_INFRA_REPO"
 update_repo "$TAK_INFRA_REPO"
-update_repo "$TEAM_MANAGER_REPO"
+# Update TAK Team Manager repository if needed
+if [ "$DEPLOY_TAKTEAMMANAGER" = true ]; then
+    update_repo "$TEAM_MANAGER_REPO"
+fi
 
 # Update CloudTAK and MediaInfra repositories if needed
 if [ "$DEPLOY_CLOUDTAK" = true ]; then
@@ -202,7 +207,7 @@ if [ "$DESTROY_MODE" = true ]; then
     fi
     
     # Destroy TAK Team Manager
-    if [ -d "TAKTeamManager" ]; then
+    if [ "$DEPLOY_TAKTEAMMANAGER" = true ] && [ -d "TAKTeamManager" ]; then
         echo "Destroying TAK Team Manager..."
         cd TAKTeamManager/cdk
         npm install
@@ -328,20 +333,22 @@ else
         --require-approval never $NO_ROLLBACK
     cd ..
     
-    # Deploy TAK Team Manager
-    echo "Deploying TAK Team Manager..."
-    cd TAKTeamManager/cdk
-    npm install
-    export CDK_DEFAULT_REGION="$REGION"
-    npm run cdk deploy -- \
-        --context envType="$ENV_TYPE" \
-        --context stackName="$STACK_NAME" \
-        --context tak-project="$PROJECT" \
-        --context tak-component="TAKTeamManager" \
-        --context tak-region="$REGION" \
-        --context useS3TAKTeamManagerConfigFile=true \
-        --require-approval never $NO_ROLLBACK
-    cd ../..
+    # Deploy TAK Team Manager if enabled
+    if [ "$DEPLOY_TAKTEAMMANAGER" = true ]; then
+        echo "Deploying TAK Team Manager..."
+        cd TAKTeamManager/cdk
+        npm install
+        export CDK_DEFAULT_REGION="$REGION"
+        npm run cdk deploy -- \
+            --context envType="$ENV_TYPE" \
+            --context stackName="$STACK_NAME" \
+            --context tak-project="$PROJECT" \
+            --context tak-component="TAKTeamManager" \
+            --context tak-region="$REGION" \
+            --context useS3TAKTeamManagerConfigFile=true \
+            --require-approval never $NO_ROLLBACK
+        cd ../..
+    fi
     # Deploy CloudTAK if enabled
     if [ "$DEPLOY_CLOUDTAK" = true ]; then
         echo "Deploying CloudTAK..."
@@ -416,11 +423,13 @@ else
     TAK_SERVER_URL=$(aws cloudformation describe-stacks --stack-name "TAK-$STACK_NAME-TakInfra" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='TakServerUrl'].OutputValue" --output text)
     echo "TAK Server URL (Admin Access): $TAK_SERVER_URL"
     
-    # Display TAK Team Manager URL
-    echo ""
-    echo "TAK Team Manager:"
-    TEAM_MANAGER_URL=$(aws cloudformation describe-stacks --stack-name "TAK-$STACK_NAME-TAKTeamManager" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='ServiceUrlOutput'].OutputValue" --output text 2>/dev/null || echo "Not available")
-    echo "Team Manager URL: $TEAM_MANAGER_URL"
+    # Display TAK Team Manager URL if deployed
+    if [ "$DEPLOY_TAKTEAMMANAGER" = true ]; then
+        echo ""
+        echo "TAK Team Manager:"
+        TEAM_MANAGER_URL=$(aws cloudformation describe-stacks --stack-name "TAK-$STACK_NAME-TAKTeamManager" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='ServiceUrlOutput'].OutputValue" --output text 2>/dev/null || echo "Not available")
+        echo "Team Manager URL: $TEAM_MANAGER_URL"
+    fi
     # Display CloudTAK URL if deployed
     if [ "$DEPLOY_CLOUDTAK" = true ]; then
         echo ""
