@@ -2,7 +2,7 @@
 set -e
 
 # Configuration Variables
-STACK_NAME="Demo"
+STACK_NAME="Akl"
 ENV_TYPE="dev-test"
 R53_ZONE_NAME=""
 ADMIN_USER_EMAIL=""
@@ -42,7 +42,7 @@ show_help() {
     echo "  --no-rollback       Disable rollback on deployment failure"
     echo ""
     echo "CONFIGURATION VARIABLES (edit at top of script):"
-    echo "  STACK_NAME          Stack identifier (default: \"Demo\")"
+    echo "  STACK_NAME          Stack identifier (default: \"Akl\")"
     echo "  ENV_TYPE            Environment type: \"dev-test\" or \"prod\" (default: \"dev-test\")"
     echo "  R53_ZONE_NAME       Route53 hosted zone name (required for deployment)"
     echo "  ADMIN_USER_EMAIL    Admin user email - must be real/valid (default: admin@R53_ZONE_NAME)"
