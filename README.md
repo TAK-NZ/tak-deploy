@@ -31,6 +31,7 @@ Layers are deployed in this order, and destroyed in reverse: BaseInfra, AuthInfr
 
 - AWS CLI configured
 - Docker installed and running
+- An amd64 (x86_64) machine or VM to run the script on is recommended. The script builds the Docker images locally and the ECS tasks run on x86_64. On an arm64 machine such as Apple Silicon, the script builds for `linux/amd64` instead (`DOCKER_DEFAULT_PLATFORM`), which needs amd64 emulation in Docker and makes builds slower
 - Node.js and npm
 - An AWS account with the Asia Pacific (New Zealand) `ap-southeast-6` region enabled (it is an opt-in region) and CDK bootstrapped there
 - [Route53 hosted zone](https://github.com/TAK-NZ/base-infra/blob/main/docs/AWS_GITHUB_SETUP.md#1-route-53-dns-setup)
