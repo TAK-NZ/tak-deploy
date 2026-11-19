@@ -1,6 +1,9 @@
 # TAK Deploy
 
 One-line installer for TAK (Team Awareness Kit) infrastructure on AWS.
+## Purpose
+This repository deploys TAK.NZ environments for **development and testing**. One script deploys all TAK.NZ layers in order, using the `dev-test` environment type (reduced resiliency, lower cost) by default.
+It is not how TAK.NZ production and demo environments are deployed. Those use the CI/CD pipelines of the individual layer repositories (see the [TAK.NZ architecture layers](https://github.com/TAK-NZ#architecture-layers)).
 
 ## Quick Install
 
