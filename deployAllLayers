@@ -11,7 +11,7 @@ REGION="ap-southeast-6"
 BRANDING="generic"
 LDAP_BASE_DN="dc=ldap,dc=tak"
 LETS_ENCRYPT_MODE="production"
-DEPLOY_TAKTEAMMANAGER=true
+DEPLOY_TAKTEAMMANAGER=false
 DEPLOY_CLOUDTAK=true
 
 # Repository URLs
@@ -51,7 +51,9 @@ show_help() {
     echo "  BRANDING            Branding type: \"generic\" or \"tak-nz\" (default: \"generic\")"
     echo "  LDAP_BASE_DN        LDAP base DN (default: \"dc=ldap,dc=tak\")"
     echo "  LETS_ENCRYPT_MODE   Let's Encrypt mode: \"staging\" or \"production\" (default: \"production\")"
-    echo "  DEPLOY_TAKTEAMMANAGER Deploy TAK Team Manager after TAK Server: true or false (default: true)"
+    echo "  DEPLOY_TAKTEAMMANAGER Deploy TAK Team Manager after TAK Server: true or false (default: false)"
+    echo "                      Needs tak-team-manager-config.env with EMAIL_PASSWORD in the current directory;"
+    echo "                      without that file Team Manager is skipped"
     echo "  DEPLOY_CLOUDTAK     Deploy CloudTAK after TAK Server: true or false (default: false)"
     echo ""
     echo "PREREQUISITES:"
@@ -136,6 +138,12 @@ if [ "$DESTROY_MODE" = false ]; then
     [ -f "takserver-config.env" ] && echo "✓ takserver-config.env found" || echo "- takserver-config.env not found"
     [ -f "tak-team-manager-config.env" ] && echo "✓ tak-team-manager-config.env found" || echo "- tak-team-manager-config.env not found"
     [ -f "cloudtak-config.env" ] && echo "✓ cloudtak-config.env found" || echo "- cloudtak-config.env not found"
+    # TAK Team Manager refuses to start in production without its SMTP settings (EMAIL_PASSWORD), which
+    # come from tak-team-manager-config.env, so an empty placeholder would only produce a failed deployment.
+    if [ "$DEPLOY_TAKTEAMMANAGER" = true ] && [ ! -f "tak-team-manager-config.env" ]; then
+        echo "Warning: DEPLOY_TAKTEAMMANAGER=true but tak-team-manager-config.env was not found in $(pwd); skipping TAK Team Manager"
+        DEPLOY_TAKTEAMMANAGER=false
+    fi
 fi
 
 # Function to clone or update repository
@@ -283,6 +291,10 @@ else
     ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
     S3_BUCKET="tak-${STACK_NAME,,}-baseinfra-${REGION}-${ACCOUNT_ID}-config"
     for config_file in "authentik-config.env" "takserver-config.env" "tak-team-manager-config.env" "cloudtak-config.env"; do
+        # Only upload the Team Manager config when it is deployed, so a placeholder never replaces a real file in S3
+        if [ "$config_file" = "tak-team-manager-config.env" ] && [ "$DEPLOY_TAKTEAMMANAGER" != true ]; then
+            continue
+        fi
         if [ -f "$INITIAL_DIR/$config_file" ]; then
             echo "Uploading existing $config_file"
             aws s3 cp --region "$REGION" "$INITIAL_DIR/$config_file" "s3://$S3_BUCKET/$config_file"

@@ -22,7 +22,7 @@ Downloads and runs the TAK infrastructure deployment script that:
 - Deploys BaseInfra (VPC, ECS, S3, certificates)
 - Deploys AuthInfra (Authentik SSO, LDAP)
 - Deploys TakInfra (TAK Server)
-- Optionally deploys TAK Team Manager to manage orgs, teams, users, devices and channels (when DEPLOY_TAKTEAMMANAGER=true, the default)
+- Optionally deploys TAK Team Manager to manage orgs, teams, users, devices and channels (when DEPLOY_TAKTEAMMANAGER=true and a `tak-team-manager-config.env` file is present)
 - Optionally deploys CloudTAK and MediaInfra (when DEPLOY_CLOUDTAK=true)
 
 Layers are deployed in this order, and destroyed in reverse: BaseInfra, AuthInfra, TakInfra, Team Manager, CloudTAK, MediaInfra.
@@ -43,11 +43,11 @@ Layers are deployed in this order, and destroyed in reverse: BaseInfra, AuthInfr
 ./deployAllLayers --destroy  # Remove all infrastructure
 ```
 
-To skip TAK Team Manager, edit the script and set `DEPLOY_TAKTEAMMANAGER=false` at the top of the file. To enable CloudTAK deployment, set `DEPLOY_CLOUDTAK=true` in the same place.
+TAK Team Manager and CloudTAK are optional. To enable TAK Team Manager, edit the script and set `DEPLOY_TAKTEAMMANAGER=true` at the top of the file, and put a `tak-team-manager-config.env` file with your SMTP settings (at least `EMAIL_PASSWORD`) in the directory you run the script from. TAK Team Manager does not start without `EMAIL_PASSWORD`, so the script skips it, with a warning, when the file is missing. To enable CloudTAK deployment, set `DEPLOY_CLOUDTAK=true` in the same place.
 
 The default region is `ap-southeast-6` (Auckland). Change `REGION` at the top of the script to deploy elsewhere.
 
-Optional `authentik-config.env`, `takserver-config.env`, `tak-team-manager-config.env` and `cloudtak-config.env` files in the current directory are uploaded to the BaseInfra config bucket. An empty file is created for any that are missing.
+Optional `authentik-config.env`, `takserver-config.env`, `tak-team-manager-config.env` and `cloudtak-config.env` files in the current directory are uploaded to the BaseInfra config bucket. An empty file is created for any that are missing, except `tak-team-manager-config.env`, which is only uploaded when TAK Team Manager is deployed.
 
 See `./deployAllLayers --help` for full options.
 
