@@ -54,4 +54,4 @@ See `./deployAllLayers --help` for full options.
 ## License
 
 TAK.NZ is distributed under [AGPL-3.0-only](LICENSE)\
-Copyright (C) 2025 - Christian Elsen, Team Awareness Kit New Zealand (TAK.NZ)
+Copyright (C) 2025-2026 - Christian Elsen, Team Awareness Kit New Zealand (TAK.NZ)
