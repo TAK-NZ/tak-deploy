@@ -2,15 +2,16 @@
 set -e
 
 # Configuration Variables
-STACK_NAME="Demo"
+STACK_NAME="Akl"
 ENV_TYPE="dev-test"
 R53_ZONE_NAME=""
 ADMIN_USER_EMAIL=""
 PROJECT="TAK on AWS"
-REGION="us-west-2"
+REGION="ap-southeast-6"
 BRANDING="generic"
 LDAP_BASE_DN="dc=ldap,dc=tak"
 LETS_ENCRYPT_MODE="production"
+DEPLOY_TAKTEAMMANAGER=true
 DEPLOY_CLOUDTAK=true
 
 # Repository URLs
@@ -18,6 +19,7 @@ BASE_INFRA_REPO="https://github.com/TAK-NZ/base-infra"
 AUTH_INFRA_REPO="https://github.com/TAK-NZ/auth-infra"
 TAK_INFRA_REPO="https://github.com/TAK-NZ/tak-infra"
 CLOUDTAK_REPO="https://github.com/TAK-NZ/CloudTAK"
+TEAM_MANAGER_REPO="https://github.com/TAK-NZ/TAKTeamManager"
 MEDIA_INFRA_REPO="https://github.com/TAK-NZ/media-infra"
 
 # Store initial directory
@@ -40,15 +42,16 @@ show_help() {
     echo "  --no-rollback       Disable rollback on deployment failure"
     echo ""
     echo "CONFIGURATION VARIABLES (edit at top of script):"
-    echo "  STACK_NAME          Stack identifier (default: \"Demo\")"
+    echo "  STACK_NAME          Stack identifier (default: \"Akl\")"
     echo "  ENV_TYPE            Environment type: \"dev-test\" or \"prod\" (default: \"dev-test\")"
     echo "  R53_ZONE_NAME       Route53 hosted zone name (required for deployment)"
     echo "  ADMIN_USER_EMAIL    Admin user email - must be real/valid (default: admin@R53_ZONE_NAME)"
     echo "  PROJECT             Project name for tagging (default: \"TAK on AWS\")"
-    echo "  REGION              AWS region (default: \"us-west-2\")"
+    echo "  REGION              AWS region (default: \"ap-southeast-6\")"
     echo "  BRANDING            Branding type: \"generic\" or \"tak-nz\" (default: \"generic\")"
     echo "  LDAP_BASE_DN        LDAP base DN (default: \"dc=ldap,dc=tak\")"
     echo "  LETS_ENCRYPT_MODE   Let's Encrypt mode: \"staging\" or \"production\" (default: \"production\")"
+    echo "  DEPLOY_TAKTEAMMANAGER Deploy TAK Team Manager after TAK Server: true or false (default: true)"
     echo "  DEPLOY_CLOUDTAK     Deploy CloudTAK after TAK Server: true or false (default: false)"
     echo ""
     echo "PREREQUISITES:"
@@ -60,6 +63,7 @@ show_help() {
     echo "OPTIONAL FILES (uploaded to S3 if present):"
     echo "  - authentik-config.env"
     echo "  - takserver-config.env"
+    echo "  - tak-team-manager-config.env"
     echo "  - cloudtak-config.env"
     echo ""
     echo "EXAMPLES:"
@@ -95,6 +99,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Make the AWS CLI and the CDK CLI use REGION. The CDK CLI resolves the target region from
+# AWS_REGION / AWS_DEFAULT_REGION or the AWS profile and overwrites CDK_DEFAULT_REGION with it,
+# so setting only CDK_DEFAULT_REGION would deploy to the profile's region instead.
+export AWS_REGION="$REGION"
+export AWS_DEFAULT_REGION="$REGION"
 # Check prerequisites and mandatory parameters (skip for destroy mode)
 if [ "$DESTROY_MODE" = false ]; then
     # Check Docker installation and status
@@ -125,6 +134,7 @@ if [ "$DESTROY_MODE" = false ]; then
     echo "Checking for optional configuration files:"
     [ -f "authentik-config.env" ] && echo "✓ authentik-config.env found" || echo "- authentik-config.env not found"
     [ -f "takserver-config.env" ] && echo "✓ takserver-config.env found" || echo "- takserver-config.env not found"
+    [ -f "tak-team-manager-config.env" ] && echo "✓ tak-team-manager-config.env found" || echo "- tak-team-manager-config.env not found"
     [ -f "cloudtak-config.env" ] && echo "✓ cloudtak-config.env found" || echo "- cloudtak-config.env not found"
 fi
 
@@ -149,6 +159,10 @@ update_repo() {
 update_repo "$BASE_INFRA_REPO"
 update_repo "$AUTH_INFRA_REPO"
 update_repo "$TAK_INFRA_REPO"
+# Update TAK Team Manager repository if needed
+if [ "$DEPLOY_TAKTEAMMANAGER" = true ]; then
+    update_repo "$TEAM_MANAGER_REPO"
+fi
 
 # Update CloudTAK and MediaInfra repositories if needed
 if [ "$DEPLOY_CLOUDTAK" = true ]; then
@@ -197,6 +211,15 @@ if [ "$DESTROY_MODE" = true ]; then
         cd ../..
     fi
     
+    # Destroy TAK Team Manager
+    if [ "$DEPLOY_TAKTEAMMANAGER" = true ] && [ -d "TAKTeamManager" ]; then
+        echo "Destroying TAK Team Manager..."
+        cd TAKTeamManager/cdk
+        npm install
+        export CDK_DEFAULT_REGION="$REGION"
+        npm run cdk destroy -- --context envType="$ENV_TYPE" --context stackName="$STACK_NAME" --force
+        cd ../..
+    fi
     # Destroy TakInfra
     echo "Destroying TakInfra..."
     cd tak-infra
@@ -220,12 +243,12 @@ if [ "$DESTROY_MODE" = true ]; then
     # Empty config bucket
     S3_BUCKET="tak-${STACK_NAME,,}-baseinfra-${REGION}-${ACCOUNT_ID}-config"
     echo "Emptying config bucket: $S3_BUCKET"
-    aws s3 rm "s3://$S3_BUCKET" --recursive || true
+    aws s3 rm --region "$REGION" "s3://$S3_BUCKET" --recursive || true
     
     # Empty ELB logs bucket
     S3_ELB_BUCKET="tak-${STACK_NAME,,}-baseinfra-${REGION}-${ACCOUNT_ID}-elblogs"
     echo "Emptying ELB logs bucket: $S3_ELB_BUCKET"
-    aws s3 rm "s3://$S3_ELB_BUCKET" --recursive || true
+    aws s3 rm --region "$REGION" "s3://$S3_ELB_BUCKET" --recursive || true
     
     # Destroy BaseInfra
     echo "Destroying BaseInfra..."
@@ -259,14 +282,14 @@ else
     echo "Uploading configuration files to S3..."
     ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
     S3_BUCKET="tak-${STACK_NAME,,}-baseinfra-${REGION}-${ACCOUNT_ID}-config"
-    for config_file in "authentik-config.env" "takserver-config.env" "cloudtak-config.env"; do
+    for config_file in "authentik-config.env" "takserver-config.env" "tak-team-manager-config.env" "cloudtak-config.env"; do
         if [ -f "$INITIAL_DIR/$config_file" ]; then
             echo "Uploading existing $config_file"
-            aws s3 cp "$INITIAL_DIR/$config_file" "s3://$S3_BUCKET/$config_file"
+            aws s3 cp --region "$REGION" "$INITIAL_DIR/$config_file" "s3://$S3_BUCKET/$config_file"
         else
             echo "Creating empty $config_file"
             touch "/tmp/$config_file"
-            aws s3 cp "/tmp/$config_file" "s3://$S3_BUCKET/$config_file"
+            aws s3 cp --region "$REGION" "/tmp/$config_file" "s3://$S3_BUCKET/$config_file"
             rm "/tmp/$config_file"
         fi
     done
@@ -315,6 +338,22 @@ else
         --require-approval never $NO_ROLLBACK
     cd ..
     
+    # Deploy TAK Team Manager if enabled
+    if [ "$DEPLOY_TAKTEAMMANAGER" = true ]; then
+        echo "Deploying TAK Team Manager..."
+        cd TAKTeamManager/cdk
+        npm install
+        export CDK_DEFAULT_REGION="$REGION"
+        npm run cdk deploy -- \
+            --context envType="$ENV_TYPE" \
+            --context stackName="$STACK_NAME" \
+            --context tak-project="$PROJECT" \
+            --context tak-component="TAKTeamManager" \
+            --context tak-region="$REGION" \
+            --context useS3TAKTeamManagerConfigFile=true \
+            --require-approval never $NO_ROLLBACK
+        cd ../..
+    fi
     # Deploy CloudTAK if enabled
     if [ "$DEPLOY_CLOUDTAK" = true ]; then
         echo "Deploying CloudTAK..."
@@ -363,7 +402,7 @@ else
     echo "Authentik Admin Credentials:"
     AUTHENTIK_URL=$(aws cloudformation describe-stacks --stack-name "TAK-$STACK_NAME-AuthInfra" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='AuthentikUrlOutput'].OutputValue" --output text)
     echo "Account URL: $AUTHENTIK_URL"
-    ADMIN_CREDS=$(aws secretsmanager get-secret-value --secret-id "TAK-$STACK_NAME-AuthInfra/Authentik/Admin-Password" --query SecretString --output text)
+    ADMIN_CREDS=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "TAK-$STACK_NAME-AuthInfra/Authentik/Admin-Password" --query SecretString --output text)
     USERNAME=$(echo "$ADMIN_CREDS" | grep -o '"username":"[^"]*"' | cut -d'"' -f4)
     PASSWORD=$(echo "$ADMIN_CREDS" | grep -o '"password":"[^"]*"' | cut -d'"' -f4)
     echo "Username: $USERNAME"
@@ -377,18 +416,25 @@ else
     
     # Download TAK Server admin certificate
     echo "Downloading TAK Server admin certificate..."
-    aws secretsmanager get-secret-value --secret-id "TAK-$STACK_NAME-TakInfra/TAK-Server/Admin-Cert" --query SecretBinary --output text | base64 -d > "$INITIAL_DIR/tak-admin-cert.p12"
+    aws secretsmanager get-secret-value --region "$REGION" --secret-id "TAK-$STACK_NAME-TakInfra/TAK-Server/Admin-Cert" --query SecretBinary --output text | base64 -d > "$INITIAL_DIR/tak-admin-cert.p12"
     echo "Admin certificate saved to: $INITIAL_DIR/tak-admin-cert.p12"
     
     # Download TAK Server federation CA certificate
     echo "Downloading TAK Server federation CA certificate..."
-    aws secretsmanager get-secret-value --secret-id "TAK-$STACK_NAME-TakInfra/TAK-Server/FederateCA" --query SecretString --output text > "$INITIAL_DIR/federation-ca.pem"
+    aws secretsmanager get-secret-value --region "$REGION" --secret-id "TAK-$STACK_NAME-TakInfra/TAK-Server/FederateCA" --query SecretString --output text > "$INITIAL_DIR/federation-ca.pem"
     echo "Federation CA certificate saved to: $INITIAL_DIR/federation-ca.pem"
 
     # Display TAK Server URL
     TAK_SERVER_URL=$(aws cloudformation describe-stacks --stack-name "TAK-$STACK_NAME-TakInfra" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='TakServerUrl'].OutputValue" --output text)
     echo "TAK Server URL (Admin Access): $TAK_SERVER_URL"
     
+    # Display TAK Team Manager URL if deployed
+    if [ "$DEPLOY_TAKTEAMMANAGER" = true ]; then
+        echo ""
+        echo "TAK Team Manager:"
+        TEAM_MANAGER_URL=$(aws cloudformation describe-stacks --stack-name "TAK-$STACK_NAME-TAKTeamManager" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='ServiceUrlOutput'].OutputValue" --output text 2>/dev/null || echo "Not available")
+        echo "Team Manager URL: $TEAM_MANAGER_URL"
+    fi
     # Display CloudTAK URL if deployed
     if [ "$DEPLOY_CLOUDTAK" = true ]; then
         echo ""
@@ -397,7 +443,7 @@ else
         echo "CloudTAK URL: $CLOUDTAK_URL"
         
         # Display CloudTAK admin credentials
-        CLOUDTAK_ADMIN_CREDS=$(aws secretsmanager get-secret-value --secret-id "TAK-$STACK_NAME-CloudTAK/API/Admin-Password" --query SecretString --output text 2>/dev/null || echo "Not available")
+        CLOUDTAK_ADMIN_CREDS=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "TAK-$STACK_NAME-CloudTAK/API/Admin-Password" --query SecretString --output text 2>/dev/null || echo "Not available")
         if [ "$CLOUDTAK_ADMIN_CREDS" != "Not available" ]; then
             CLOUDTAK_USERNAME=$(echo "$CLOUDTAK_ADMIN_CREDS" | grep -o '"username":"[^"]*"' | cut -d'"' -f4)
             CLOUDTAK_PASSWORD=$(echo "$CLOUDTAK_ADMIN_CREDS" | grep -o '"password":"[^"]*"' | cut -d'"' -f4)

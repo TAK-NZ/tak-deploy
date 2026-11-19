@@ -1,0 +1,18 @@
+# TAK Server download (takserver-docker-<version>.zip from tak.gov)
+/takserver-docker-*
+
+# Repositories cloned by deployAllLayers
+/base-infra/
+/auth-infra/
+/tak-infra/
+/TAKTeamManager/
+/CloudTAK/
+/media-infra/
+
+# Files written by deployAllLayers (certificates and optional config, may contain secrets)
+/tak-admin-cert.p12
+/federation-ca.pem
+/authentik-config.env
+/takserver-config.env
+/tak-team-manager-config.env
+/cloudtak-config.env
